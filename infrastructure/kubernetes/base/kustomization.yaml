@@ -1,0 +1,61 @@
+# Human Tasks:
+# 1. Create secrets.env file in the same directory with required secret values
+# 2. Ensure namespace.yaml, service-account.yaml, secrets.yaml, and configmap.yaml exist in the same directory
+# 3. Verify that the NAMESPACE environment variable is properly set in the deployment environment
+
+# Kustomize v4.5+ configuration for base resources
+# Addresses requirements from:
+# - 11.1 Deployment Environment/11.1.1 Environment Architecture
+# - 11.4 Orchestration/11.4.2 Kubernetes Resources
+# - 10.2 Data Security/10.2.1 Data Classification
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Resources to be included in both staging and production environments
+resources:
+  - namespace.yaml
+  - service-account.yaml
+  - secrets.yaml
+  - configmap.yaml
+
+# Secret generation from environment file
+# Implements requirement from 10.2 Data Security/10.2.1 Data Classification
+secretGenerator:
+  - name: app-secrets
+    type: Opaque
+    envs:
+      - secrets.env
+
+# Common labels for all resources
+# Implements requirement from 11.4 Orchestration/11.4.2 Kubernetes Resources
+commonLabels:
+  app: code-generation-app
+  managed-by: kustomize
+
+# Common annotations for all resources
+# Implements requirement from 11.4 Orchestration/11.4.2 Kubernetes Resources
+commonAnnotations:
+  app.kubernetes.io/part-of: code-generation-app
+  app.kubernetes.io/managed-by: kustomize
+
+# Namespace configuration
+# Implements requirement from 11.1 Deployment Environment/11.1.1 Environment Architecture
+namespace: ${NAMESPACE}
+
+# Configuration for name customization
+# Allows for environment-specific resource naming
+namePrefix: ""
+nameSuffix: ""
+
+# Patches to be applied to resources
+# Empty by default, can be extended in environment overlays
+patches: []
+
+# Configuration for handling ConfigMap and Secret generators
+generatorOptions:
+  # Ensures consistent hash suffixes for generated resources
+  disableNameSuffixHash: false
+  # Labels to be added to generated resources
+  labels:
+    generated-by: kustomize
