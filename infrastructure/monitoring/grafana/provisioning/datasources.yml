@@ -1,0 +1,113 @@
+# Human Tasks:
+# 1. Verify Prometheus service is accessible at http://prometheus:9090
+# 2. Ensure network policies allow Grafana to access Prometheus
+# 3. Review and adjust timeInterval and queryTimeout based on system performance
+# 4. Configure additional security measures if exposing Grafana externally
+# 5. Set up appropriate RBAC for Grafana service account
+
+# Requirement: System Monitoring - Grafana datasource API version
+apiVersion: 1
+
+# Requirement: System Monitoring - Clean up any existing datasources
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+
+# Requirement: System Monitoring - Configure Prometheus as primary datasource
+# Requirement: Security Monitoring - Setup secure access to metrics
+# Requirement: Infrastructure Monitoring - Configure monitoring for all environments
+datasources:
+  # Main Prometheus datasource for metrics collection
+  - name: Prometheus
+    type: prometheus
+    # Requirement: Security Monitoring - Use proxy mode for security
+    access: proxy
+    # Internal Kubernetes service DNS for Prometheus
+    url: http://prometheus:9090
+    isDefault: true
+    version: 1
+    # Prevent runtime modifications for security
+    editable: false
+    jsonData:
+      # Metrics collection interval matching Prometheus config
+      timeInterval: "15s"
+      # Query timeout for complex operations
+      queryTimeout: "60s"
+      # Use POST method for larger queries
+      httpMethod: "POST"
+      # Enable exemplars for trace correlation
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+      # Enable alerting capabilities
+      alertingEnabled: true
+      # Disable direct database access
+      queryProxy: true
+      # Custom HTTP headers if needed
+      httpHeaderName1: "X-Scope-OrgID"
+    secureJsonData:
+      # Custom HTTP headers value if needed
+      httpHeaderValue1: "${GRAFANA_ORG_ID}"
+    
+  # Optional secondary Prometheus for high-availability
+  - name: Prometheus-Backup
+    type: prometheus
+    access: proxy
+    url: http://prometheus-backup:9090
+    isDefault: false
+    version: 1
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: "POST"
+      # Disable exemplars for backup instance
+      exemplarEnabled: false
+      alertingEnabled: false
+      queryProxy: true
+
+  # Development environment Prometheus
+  - name: Prometheus-Dev
+    type: prometheus
+    access: proxy
+    url: http://prometheus-dev:9090
+    isDefault: false
+    version: 1
+    editable: false
+    jsonData:
+      timeInterval: "30s"
+      queryTimeout: "30s"
+      httpMethod: "POST"
+      alertingEnabled: false
+
+  # Staging environment Prometheus
+  - name: Prometheus-Staging
+    type: prometheus
+    access: proxy
+    url: http://prometheus-staging:9090
+    isDefault: false
+    version: 1
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "45s"
+      httpMethod: "POST"
+      alertingEnabled: true
+
+  # Production environment Prometheus
+  - name: Prometheus-Prod
+    type: prometheus
+    access: proxy
+    url: http://prometheus-prod:9090
+    isDefault: false
+    version: 1
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: "POST"
+      alertingEnabled: true
+      # Enable exemplars for production
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo-prod
