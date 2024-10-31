@@ -1,0 +1,56 @@
+# Core Framework - RESTful API development
+Flask==2.0.0  # Core web framework for building the RESTful API
+flask-cors==3.0.0  # CORS support for Flask application
+
+# Database and ORM
+SQLAlchemy==1.4.0  # ORM for database operations and migrations
+psycopg2-binary==2.9.0  # PostgreSQL adapter for Python
+alembic==1.7.0  # Database migration tool
+
+# Caching
+redis==6.0.0  # Redis client for caching layer
+
+# Authentication and Security
+google-auth==2.0.0  # Google Cloud authentication integration
+PyJWT==2.0.0  # JWT token handling for authentication
+
+# Data Validation and Serialization
+marshmallow==3.0.0  # Object serialization/deserialization library
+
+# Production Server
+gunicorn==20.1.0  # WSGI HTTP server for production deployment
+
+# Testing
+pytest==6.0.0  # Testing framework for unit and integration tests
+pytest-cov==2.12.0  # Coverage reporting for tests
+pytest-mock==3.6.1  # Mocking support for pytest
+
+# Environment Management
+python-dotenv==0.19.0  # Environment variable management
+
+# Monitoring and Metrics
+prometheus-client==0.12.0  # Prometheus metrics integration
+
+# Development Tools
+black==21.5b2  # Code formatting
+flake8==3.9.2  # Code linting
+isort==5.9.3  # Import sorting
+
+# Logging
+structlog==21.1.0  # Structured logging
+python-json-logger==2.0.2  # JSON format logging
+
+# Performance and Optimization
+ujson==4.0.2  # Fast JSON processing
+uvicorn==0.15.0  # ASGI server implementation
+
+# Security
+cryptography==3.4.7  # Cryptographic recipes and primitives
+bcrypt==3.2.0  # Password hashing
+python-jose==3.3.0  # JavaScript Object Signing and Encryption
+
+# Rate Limiting
+Flask-Limiter==1.4  # Rate limiting for Flask applications
+
+# Documentation
+Flask-OpenAPI==0.1.1  # OpenAPI/Swagger support
