@@ -1,0 +1,148 @@
+# Human Tasks:
+# 1. Configure Workload Identity Federation in GCP for GitHub Actions
+# 2. Set up required GitHub repository secrets:
+#    - GCP_PROJECT_ID
+#    - GKE_CLUSTER
+#    - GKE_ZONE
+#    - WORKLOAD_IDENTITY_PROVIDER
+# 3. Verify production environment protection rules are enabled
+# 4. Ensure main branch protection rules are configured
+# 5. Validate Docker registry permissions are set up correctly
+
+# Production Deployment Workflow
+# Addresses requirements:
+# - Production Deployment (11.1 Deployment Environment/11.1.1 Environment Architecture)
+# - CI/CD Pipeline (11.5 CI/CD Pipeline/11.5.2 Pipeline Stages)
+# - Security Compliance (10.3 Security Protocols/10.3.4 Security Compliance)
+
+name: Deploy to Production
+
+# Trigger on pushes to main branch affecting backend code or production infrastructure
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/backend/**'
+      - 'infrastructure/kubernetes/overlays/prod/**'
+
+# Environment variables
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GKE_CLUSTER: ${{ secrets.GKE_CLUSTER }}
+  GKE_ZONE: ${{ secrets.GKE_ZONE }}
+  IMAGE: gcr.io/${{ secrets.GCP_PROJECT_ID }}/code-generation-app
+
+# Required permissions for GitHub Actions
+permissions:
+  contents: read
+  id-token: write
+
+# Production deployment jobs
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    
+    # Production environment configuration with protection rules
+    environment:
+      name: production
+      url: https://api.code-generation-app.com
+    
+    # Timeout and error handling configuration
+    timeout-minutes: 30
+    
+    steps:
+      # Checkout repository code
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      # Authenticate with Google Cloud
+      - name: Google Auth
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: github-actions@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+          token_format: access_token
+      
+      # Setup Google Cloud CLI
+      - name: Setup Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: '>= 363.0.0'
+          project_id: ${{ env.GCP_PROJECT_ID }}
+      
+      # Configure Docker authentication
+      - name: Configure Docker
+        run: |
+          gcloud auth configure-docker --quiet
+      
+      # Get GKE cluster credentials
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v1
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_ZONE }}
+      
+      # Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag ${{ env.IMAGE }}:${{ github.sha }} \
+            --tag ${{ env.IMAGE }}:latest \
+            --cache-from ${{ env.IMAGE }}:latest \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --file src/backend/docker/Dockerfile .
+      
+      # Push Docker image to registry
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+      
+      # Update Kustomization with new image
+      - name: Update kustomization
+        run: |
+          cd infrastructure/kubernetes/overlays/prod
+          kustomize edit set image ${{ env.IMAGE }}=${{ env.IMAGE }}:${{ github.sha }}
+      
+      # Deploy to GKE with zero-downtime update
+      - name: Deploy to GKE
+        run: |
+          kubectl apply -k infrastructure/kubernetes/overlays/prod
+      
+      # Verify deployment success
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/prod-code-generation-app -n code-generation-app --timeout=5m
+      
+      # Health check verification
+      - name: Verify application health
+        run: |
+          # Wait for pods to be ready
+          sleep 30
+          # Get the service endpoint
+          SERVICE_IP=$(kubectl get service prod-code-generation-app -n code-generation-app -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          # Check health endpoint
+          curl -f http://$SERVICE_IP/health || exit 1
+      
+      # Notify on deployment completion
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [[ ${{ job.status }} == 'success' ]]; then
+            echo "Production deployment completed successfully"
+          else
+            echo "Production deployment failed"
+            exit 1
+          fi
+
+    # Retry configuration for transient failures
+    retry:
+      max_attempts: 2
+      conditions:
+        - network-error
+        - server-error
