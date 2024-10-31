@@ -1,0 +1,112 @@
+# Human Tasks:
+# 1. Configure GCP_PROJECT_ID secret in GitHub repository
+# 2. Configure GCP_SA_KEY secret in GitHub repository
+# 3. Set up workload identity federation in GCP
+# 4. Configure GKE cluster with staging node pool
+# 5. Verify container registry permissions
+# 6. Review resource quotas in GKE cluster
+
+# Requirement: Continuous Deployment - Implements automated deployment pipeline
+name: Deploy to Staging
+
+# Requirement: Staging Environment Deployment - Triggers on develop branch changes
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'src/backend/**'
+      - 'infrastructure/kubernetes/overlays/staging/**'
+
+# Environment variables configuration
+env:
+  GKE_CLUSTER: code-generation-staging
+  GKE_ZONE: us-central1
+  IMAGE_NAME: code-generation-app
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGISTRY: gcr.io
+
+# Requirement: Container Management - Implements secure deployment pipeline
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    
+    # Required permissions for GCP workload identity
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+      # Requirement: Continuous Deployment - Checks out repository code
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      # Requirement: Container Management - Authenticates with Google Cloud
+      - name: Google Auth
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: github-actions@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+      
+      # Requirement: Container Management - Sets up Google Cloud CLI
+      - name: Setup Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+      
+      # Requirement: Staging Environment Deployment - Gets GKE credentials
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v1
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_ZONE }}
+      
+      # Requirement: Container Management - Sets up Docker Buildx
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      # Requirement: Container Management - Logs in to Google Container Registry
+      - name: Login to GCR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+      
+      # Requirement: Container Management - Builds and pushes Docker image
+      - name: Build and push image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./src/backend
+          file: ./src/backend/docker/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:staging
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            FLASK_ENV=staging
+      
+      # Requirement: Staging Environment Deployment - Deploys to GKE
+      - name: Deploy to GKE
+        run: |
+          # Update kustomize image
+          cd infrastructure/kubernetes/overlays/staging
+          kustomize edit set image code-generation-app=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:staging
+          
+          # Apply the configuration
+          kubectl apply -k .
+          
+          # Verify deployment
+          kubectl rollout status deployment/staging-code-generation-app -n code-generation-app --timeout=300s
+      
+      # Requirement: Continuous Deployment - Verifies deployment health
+      - name: Verify deployment
+        run: |
+          # Check deployment status
+          READY=$(kubectl get deployment staging-code-generation-app -n code-generation-app -o jsonpath='{.status.readyReplicas}')
+          DESIRED=$(kubectl get deployment staging-code-generation-app -n code-generation-app -o jsonpath='{.spec.replicas}')
+          
+          if [ "$READY" != "$DESIRED" ]; then
+            echo "Deployment verification failed. Ready replicas: $READY, Desired replicas: $DESIRED"
+            exit 1
+          fi
