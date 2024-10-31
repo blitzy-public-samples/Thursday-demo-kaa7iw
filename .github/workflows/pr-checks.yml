@@ -181,13 +181,13 @@ jobs:
           fetch-depth: 0
       
       - name: Download coverage reports
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: coverage-reports
           path: src/backend
       
       - name: Download security reports
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: security-reports
           path: src/backend
