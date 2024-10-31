@@ -1,0 +1,131 @@
+# Python bytecode and cache files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+env/
+venv/
+ENV/
+.env
+.env.*
+!.env.example
+
+# Testing and coverage
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log
+logs/
+
+# IDE configurations
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build and distribution
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Infrastructure and credentials
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+kubeconfig
+*.pem
+*.key
+
+# Addresses requirement: Security/10.1 Authentication and Authorization
+# Prevents sensitive authentication files from being committed
+google_credentials.json
+service-account.json
+client_secrets.json
+
+# Addresses requirement: Infrastructure Security/11.1 Deployment Environment
+# Prevents infrastructure credentials from being exposed
+gcp-credentials.json
+*.tfvars.json
+.terraformrc
+terraform.rc
+
+# Local development files
+.DS_Store
+*.bak
+*.tmp
+*.temp
+
+# Database files
+*.sqlite
+*.db
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Kubernetes
+kubeconfig*
+*.kubeconfig
+kube-config*
+
+# SSL/TLS certificates
+*.crt
+*.cert
+*.csr
+*.p12
+
+# Application specific
+instance/
+.webassets-cache/
+
+# Dependency management
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Local configuration
+config.local.py
+local_settings.py
+
+# Cache directories
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# Backup files
+*.bak
+*~
