@@ -1,0 +1,65 @@
+# Human Tasks:
+# 1. Ensure the SSL certificate 'code-generation-app-staging-cert' is created in GCP
+# 2. Verify the static IP 'code-generation-app-staging-ip' is reserved in GCP
+# 3. Confirm the frontend config 'code-generation-app-frontend-config' exists
+# 4. Validate DNS records for staging-api.codegeneration.app point to the static IP
+
+# Kubernetes v1.24+ Ingress configuration for staging environment
+# Addresses requirements:
+# - Staging Environment Network Access (11.1 Deployment Environment/11.1.2 Environment Specifications)
+# - Load Balancing (7.1 High-Level Architecture/API Gateway Layer)
+# - SSL Termination (11.2 Cloud Services/11.2.1 Google Cloud Platform Services)
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: code-generation-app
+  namespace: code-generation-app
+  labels:
+    app: code-generation-app
+    environment: staging
+    managed-by: kustomize
+  annotations:
+    # GCP Load Balancer configuration
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "code-generation-app-staging-ip"
+    
+    # SSL certificate configuration
+    networking.gke.io/managed-certificates: "code-generation-app-staging-cert"
+    networking.gke.io/v1beta1.FrontendConfig: "code-generation-app-frontend-config"
+    
+    # Security headers configuration
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    
+    # CORS configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    
+    # Application metadata
+    app.kubernetes.io/part-of: code-generation-app
+    app.kubernetes.io/managed-by: kustomize
+    
+    # Backend configuration
+    cloud.google.com/backend-config: '{"default": "code-generation-app-backend-config"}'
+    
+    # Health check configuration
+    cloud.google.com/health-check-path: "/health"
+    
+spec:
+  rules:
+    - host: staging-api.codegeneration.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: code-generation-app
+                port:
+                  name: http
+                  
+  # TLS configuration is handled by GCP managed certificates
+  tls: []  # Empty as we're using GCP managed certificates
