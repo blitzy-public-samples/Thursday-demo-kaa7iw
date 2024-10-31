@@ -1,0 +1,49 @@
+# Human Tasks:
+# 1. Ensure VERSION environment variable is set in the deployment pipeline
+# 2. Verify that all referenced resources exist in the specified paths
+# 3. Validate that the namespace matches the production environment configuration
+# 4. Confirm that the replica count aligns with production load requirements
+
+# Kustomize v4.5+ configuration for production environment
+# Addresses requirements:
+# - Production Environment Configuration (11.1 Deployment Environment/11.1.2 Environment Specifications)
+# - Kubernetes Resource Management (11.4 Orchestration/11.4.2 Kubernetes Resources)
+# - High Availability (11.4 Orchestration/11.4.1 Kubernetes Architecture)
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base resources to inherit from
+resources:
+  - ../../base
+  - deployment.yaml
+  - hpa.yaml
+
+# Production namespace configuration
+namespace: code-generation-app
+
+# Production-specific prefix for all resources
+namePrefix: prod-
+
+# Production environment labels
+commonLabels:
+  environment: production
+  tier: backend
+
+# Production environment annotations
+commonAnnotations:
+  app.kubernetes.io/environment: production
+  app.kubernetes.io/version: ${VERSION}
+  app.kubernetes.io/part-of: code-generation-app
+
+# Patches to customize the deployment for production
+patches:
+  - path: deployment.yaml
+    target:
+      kind: Deployment
+      name: code-generation-app
+
+# Production replica configuration for high availability
+replicas:
+  - name: code-generation-app
+    count: 3
