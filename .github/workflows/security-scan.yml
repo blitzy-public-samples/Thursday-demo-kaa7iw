@@ -77,7 +77,7 @@ jobs:
 
       # Requirement: Security Compliance - Scans container for vulnerabilities
       - name: Run Trivy container scan
-        uses: aquasecurity/trivy-action@0.10.0
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ${{ env.DOCKER_IMAGE }}
           format: 'table'
