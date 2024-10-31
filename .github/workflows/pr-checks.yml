@@ -1,0 +1,208 @@
+# Human Tasks:
+# 1. Configure SonarQube server URL and token in repository secrets
+# 2. Set up TEST_DB_PASSWORD secret for test database access
+# 3. Ensure Redis is available in the GitHub Actions environment
+# 4. Configure any additional test environment variables if needed
+
+name: Pull Request Checks
+
+# Requirement: Testing Framework - Implements automated testing using pytest framework
+# Requirement: Code Quality - Enforces code quality standards through SonarQube analysis
+# Requirement: Security Compliance - Implements security scanning and validation checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - develop
+
+env:
+  PYTHON_VERSION: '3.9'
+  POSTGRES_DB: test_db
+  POSTGRES_USER: test_user
+  POSTGRES_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
+  REDIS_URL: redis://localhost:6379/0
+
+jobs:
+  setup:
+    name: Setup Environment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Required for SonarQube analysis
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('src/backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          cd src/backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+  lint:
+    name: Code Linting
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install linting dependencies
+        run: |
+          pip install flake8==3.9.2 black==21.5b2 isort==5.9.3
+      
+      - name: Run flake8
+        run: |
+          cd src/backend
+          flake8 . --count --max-line-length=100 --statistics
+      
+      - name: Run black
+        run: |
+          cd src/backend
+          black . --check --diff
+      
+      - name: Run isort
+        run: |
+          cd src/backend
+          isort . --check-only --diff
+
+  test:
+    name: Run Tests
+    needs: setup
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:6
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install test dependencies
+        run: |
+          cd src/backend
+          pip install -r requirements.txt
+          pip install pytest-cov==2.12.0
+      
+      - name: Run pytest with coverage
+        run: |
+          cd src/backend
+          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=80
+      
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-reports
+          path: src/backend/coverage.xml
+
+  security_scan:
+    name: Security Analysis
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install security tools
+        run: |
+          pip install bandit safety
+      
+      - name: Run bandit security scan
+        run: |
+          cd src/backend
+          bandit -r app/ -f json -o bandit-results.json
+      
+      - name: Check dependencies for known vulnerabilities
+        run: |
+          cd src/backend
+          safety check -r requirements.txt
+      
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: src/backend/bandit-results.json
+
+  sonarqube:
+    name: SonarQube Analysis
+    needs: [test, security_scan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Download coverage reports
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-reports
+          path: src/backend
+      
+      - name: Download security reports
+        uses: actions/download-artifact@v3
+        with:
+          name: security-reports
+          path: src/backend
+      
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=code-generation-backend
+            -Dsonar.python.coverage.reportPaths=src/backend/coverage.xml
+            -Dsonar.python.bandit.reportPaths=src/backend/bandit-results.json
+            -Dsonar.sources=src/backend/app
+            -Dsonar.tests=src/backend/tests
+            -Dsonar.python.version=${{ env.PYTHON_VERSION }}
+            -Dsonar.qualitygate.wait=true
