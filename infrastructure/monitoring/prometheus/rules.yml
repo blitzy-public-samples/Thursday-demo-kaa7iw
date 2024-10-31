@@ -1,0 +1,139 @@
+# Human Tasks:
+# 1. Configure Prometheus server to load this rules file in prometheus.yml
+# 2. Verify metric collection endpoints are exposed in the application
+# 3. Set up alertmanager for alert routing and notification
+# 4. Configure appropriate notification channels (email, Slack, etc.)
+# 5. Review and adjust thresholds based on production load patterns
+
+# Prometheus Rules v2.0+
+groups:
+  # Requirement: System Monitoring - Flask application performance monitoring
+  - name: flask_application_rules
+    rules:
+      - alert: HighRequestLatency
+        expr: http_request_duration_seconds > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "High HTTP request latency detected"
+          threshold: "2 seconds"
+          summary: "Endpoint {{ $labels.endpoint }} has latency > 2s"
+          
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          description: "High HTTP error rate detected"
+          threshold: "10% of requests"
+          summary: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.endpoint }}"
+          
+      - alert: AuthFailures
+        expr: rate(auth_failures_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          description: "High rate of authentication failures"
+          threshold: "10 failures per 5 minutes"
+          summary: "Auth failures rate is {{ $value }} per 5m"
+
+  # Requirement: Infrastructure Monitoring - Database performance monitoring
+  - name: database_rules
+    rules:
+      - alert: HighDatabaseLatency
+        expr: pg_query_duration_seconds > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "High database query latency"
+          threshold: "1 second"
+          summary: "Query latency is {{ $value }}s for {{ $labels.query_type }}"
+          
+      - alert: DatabaseConnectionPoolSaturation
+        expr: pg_connections_used / pg_connections_max > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "Database connection pool near capacity"
+          threshold: "80% utilization"
+          summary: "Connection pool is at {{ $value | humanizePercentage }} capacity"
+
+      # Recording rule for connection pool trends
+      - record: pg_connection_pool_utilization:5m
+        expr: rate(pg_connections_used[5m]) / pg_connections_max
+
+  # Requirement: Infrastructure Monitoring - Cache performance monitoring
+  - name: cache_rules
+    rules:
+      - alert: CacheMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "Redis memory usage high"
+          threshold: "90% utilization"
+          summary: "Redis memory usage at {{ $value | humanizePercentage }}"
+
+      # Recording rule for cache hit ratio
+      - record: redis_cache_hit_ratio:5m
+        expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))
+
+  # Requirement: Infrastructure Monitoring - System resource monitoring
+  - name: system_rules
+    rules:
+      - alert: HighCPUUsage
+        expr: instance:node_cpu_utilization:avg5m > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "High CPU utilization"
+          threshold: "80% over 5 minutes"
+          summary: "CPU usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          
+      - alert: LowMemory
+        expr: node_memory_available_bytes / node_memory_total_bytes < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          description: "Low available memory"
+          threshold: "Less than 10% available"
+          summary: "Memory available is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      # Recording rules for system metrics
+      - record: instance:node_memory_utilization:avg5m
+        expr: 1 - avg_over_time(node_memory_available_bytes[5m]) / node_memory_total_bytes
+
+  # Requirement: Security Monitoring - Security-related alerts
+  - name: security_rules
+    rules:
+      - alert: RateLimitExceeded
+        expr: rate(rate_limit_exceeded_total[5m]) > 100
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          description: "High rate of rate-limit violations"
+          threshold: "100 per 5 minutes"
+          summary: "Rate limit exceeded {{ $value }} times in 5m for {{ $labels.ip }}"
+
+      - alert: UnauthorizedAccessAttempts
+        expr: rate(unauthorized_access_attempts_total[5m]) > 50
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          description: "High number of unauthorized access attempts"
+          threshold: "50 attempts per 5 minutes"
+          summary: "{{ $value }} unauthorized attempts from {{ $labels.ip }}"
+
+      # Recording rule for security metrics
+      - record: security:failed_auth_rate:5m
+        expr: sum(rate(auth_failures_total[5m])) by (endpoint)
