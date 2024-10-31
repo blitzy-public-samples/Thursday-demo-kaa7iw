@@ -1,0 +1,35 @@
+# Requirement: Container Runtime - Excludes Python bytecode cache directories
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.pytest_cache
+
+# Requirement: Security Considerations - Excludes sensitive files and development artifacts
+.env
+.env.*
+.git
+.gitignore
+.coverage
+htmlcov/*
+
+# Requirement: Container Runtime - Excludes Docker configuration files except Dockerfile
+docker/*
+!docker/Dockerfile
+
+# Requirement: Security Considerations - Excludes test and infrastructure files
+tests/*
+infrastructure/*
+
+# Requirement: Container Runtime - Excludes documentation and auxiliary files
+*.log
+*.md
+LICENSE
+
+# Requirement: Build Optimization - Excludes unnecessary files to reduce build context
+.vscode/
+.idea/
+__pycache__/
+*.swp
+*.swo
+.DS_Store
