@@ -1,0 +1,190 @@
+# Human Tasks:
+# 1. Verify that the container image tag exists in the container registry
+# 2. Ensure the service account has necessary IAM roles configured
+# 3. Confirm that the node pool has sufficient resources for the specified requests
+# 4. Validate that the health check endpoints are implemented in the application
+# 5. Verify that the HorizontalPodAutoscaler is configured for this deployment
+
+# Kubernetes v1.24+ Deployment configuration for production environment
+# Addresses requirements:
+# - Production Deployment Configuration (11.1 Deployment Environment/11.1.2 Environment Specifications)
+# - Container Configuration (11.3 Containerization/11.3.1 Docker Configuration)
+# - High Availability (11.4 Orchestration/11.4.2 Kubernetes Resources)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: code-generation-app
+  namespace: code-generation-app  # From namespace.yaml
+  labels:
+    app: code-generation-app
+    environment: production
+    managed-by: kustomize
+    tier: backend
+    version: v1
+  annotations:
+    app.kubernetes.io/name: code-generation-app
+    app.kubernetes.io/part-of: code-generation-app
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/environment: production
+    
+    # Deployment strategy annotations
+    kubernetes.io/change-cause: "Production deployment"
+    deployment.kubernetes.io/revision: "1"
+    
+    # Security annotations
+    security.kubernetes.io/pod-security: "restricted"
+    container.seccomp.security.alpha.kubernetes.io/pod: "runtime/default"
+    
+    # Monitoring annotations
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
+
+spec:
+  # High Availability: Maintain 3 replicas for redundancy
+  replicas: 3
+  
+  # Deployment strategy configuration
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  # Pod selector configuration
+  selector:
+    matchLabels:
+      app: code-generation-app
+      environment: production
+  
+  template:
+    metadata:
+      labels:
+        app: code-generation-app
+        environment: production
+        tier: backend
+      annotations:
+        # Pod-specific annotations
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+        
+        # Security annotations
+        seccomp.security.alpha.kubernetes.io/pod: "runtime/default"
+        container.apparmor.security.beta.kubernetes.io/main: "runtime/default"
+    
+    spec:
+      # Service account configuration from service-account.yaml
+      serviceAccountName: code-generation-app-sa
+      
+      # Security context for the pod
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Container configuration
+      containers:
+        - name: backend
+          image: gcr.io/code-generation-app/backend:latest
+          imagePullPolicy: Always
+          
+          # Container ports
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          
+          # Resource requirements (Production: 4 vCPU, 16GB RAM)
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+            limits:
+              cpu: "4"
+              memory: "16Gi"
+          
+          # Environment variables from ConfigMap and Secrets
+          envFrom:
+            - configMapRef:
+                name: code-generation-app-config  # From configmap.yaml
+            - secretRef:
+                name: code-generation-app-secrets  # From secrets.yaml
+          
+          # Liveness probe configuration
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          # Readiness probe configuration
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          
+          # Startup probe configuration
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+          
+          # Security context for the container
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          
+          # Volume mounts for temporary storage
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /var/cache
+      
+      # Volumes configuration
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+      
+      # Node affinity for production workloads
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cloud.google.com/gke-nodepool
+                    operator: In
+                    values:
+                      - production-pool
+      
+      # Pod topology spread constraints
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: code-generation-app
+      
+      # Pod disruption budget reference
+      terminationGracePeriodSeconds: 60
