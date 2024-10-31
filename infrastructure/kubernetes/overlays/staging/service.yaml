@@ -1,0 +1,60 @@
+# Human Tasks:
+# 1. Verify that the GCP backend configuration exists and is properly configured
+# 2. Ensure the health check endpoint is implemented in the application
+# 3. Confirm that the service ports match the container ports in deployment
+# 4. Validate that the network policies allow required traffic flow
+
+# Kubernetes v1.24+ Service configuration for staging environment
+# Addresses requirements:
+# - Staging Environment Network Configuration (11.1 Deployment Environment/11.1.2 Environment Specifications)
+# - Load Balancing (7.1 High-Level Architecture/API Gateway Layer)
+# - Health Monitoring (11.4 Orchestration/11.4.2 Kubernetes Resources)
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: code-generation-app
+  namespace: code-generation-app
+  labels:
+    app: code-generation-app
+    environment: staging
+    managed-by: kustomize
+  annotations:
+    # GCP-specific annotations for load balancer and health checks
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "code-generation-app-backend-config"}'
+    
+    # Application metadata
+    app.kubernetes.io/part-of: code-generation-app
+    app.kubernetes.io/managed-by: kustomize
+    
+    # Health check configuration
+    health-check-port: "8000"
+    health-check-path: "/health"
+    
+spec:
+  # Using ClusterIP as we'll expose through GCP Load Balancer
+  type: ClusterIP
+  
+  # Port configuration matching container port from deployment
+  ports:
+    - name: http
+      port: 80  # External port
+      targetPort: 8000  # Container port
+      protocol: TCP
+  
+  # Selector matching deployment pod labels for service discovery
+  selector:
+    app: code-generation-app
+    environment: staging
+  
+  # Session affinity configuration for consistent routing
+  sessionAffinity: None
+  
+  # Publishing not ready addresses for proper health monitoring
+  publishNotReadyAddresses: false
+  
+  # IP families configuration
+  ipFamilyPolicy: SingleStack
+  ipFamilies:
+    - IPv4
