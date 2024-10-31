@@ -1,0 +1,58 @@
+# Dependabot configuration file v2
+# Automatically updates dependencies for Python packages, Docker images, GitHub Actions, and Terraform modules
+# Addresses requirements:
+# - Security Compliance: Ensures automated security updates and vulnerability patches through dependency monitoring
+# - Technology Stack Versioning: Maintains specified version requirements for Python packages and third-party dependencies
+
+version: 2
+updates:
+  # Python dependencies configuration for backend service
+  - package-ecosystem: "pip"
+    directory: "/src/backend"
+    schedule:
+      interval: "weekly"
+    allow:
+      # Only allow direct dependencies to be updated to avoid conflicts
+      - dependency-type: "direct"
+    versioning-strategy: "lockfile-only"
+    labels:
+      - "dependencies"
+      - "python"
+    reviewers:
+      - "CODEOWNERS"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  # Docker image updates for backend service
+  - package-ecosystem: "docker"
+    directory: "/src/backend/docker"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"
+    reviewers:
+      - "CODEOWNERS"
+
+  # GitHub Actions workflow updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    reviewers:
+      - "CODEOWNERS"
+
+  # Terraform module updates for infrastructure
+  - package-ecosystem: "terraform"
+    directory: "/infrastructure/terraform/gcp"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "terraform"
+    reviewers:
+      - "CODEOWNERS"
