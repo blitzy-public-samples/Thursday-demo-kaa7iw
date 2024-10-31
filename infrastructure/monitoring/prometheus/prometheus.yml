@@ -1,0 +1,125 @@
+# Human Tasks:
+# 1. Verify network access between Prometheus and monitored services
+# 2. Configure alertmanager notification channels (email, Slack, etc.)
+# 3. Review and adjust scraping intervals based on system load
+# 4. Set up appropriate network policies in Kubernetes
+# 5. Configure authentication for metrics endpoints if required
+
+# Prometheus v2.0+ Configuration
+# Requirement: System Monitoring - Global configuration for metrics collection
+
+global:
+  scrape_interval: 15s     # Default interval for metrics collection
+  evaluation_interval: 15s # Default interval for rule evaluation
+  scrape_timeout: 10s     # Timeout for individual scrape operations
+
+# Requirement: Security Monitoring - Import alert rules for security metrics
+# Infrastructure Monitoring - Import monitoring rules for system health
+rule_files:
+  - "rules.yml"  # Contains Flask, database, cache, and security monitoring rules
+
+# Requirement: System Monitoring - Service discovery and metrics collection
+scrape_configs:
+  # Flask Application Monitoring
+  - job_name: 'flask-app'
+    metrics_path: '/metrics'
+    scheme: 'http'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: ['default']
+    relabel_configs:
+      - source_labels: ['__meta_kubernetes_pod_label_app']
+        regex: 'flask-app'
+        action: 'keep'
+
+  # Database Monitoring
+  - job_name: 'postgresql'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  # Cache Monitoring
+  - job_name: 'redis'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # Node Monitoring
+  - job_name: 'node'
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics
+
+  # API Server Monitoring
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+      - role: endpoints
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+
+# Requirement: Infrastructure Monitoring - Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 15d
+    retention.size: 50GB
+    wal:
+      retention.time: 12h
+
+# Security configuration
+tls_server_config:
+  cert_file: /etc/prometheus/certs/prometheus.crt
+  key_file: /etc/prometheus/certs/prometheus.key
+
+# HTTP server configuration
+web:
+  external_url: 'https://prometheus.example.com'
+  route_prefix: /
+  cors:
+    cors_origins: ['*']
+  compression:
+    enabled: true
+
+# Query configuration
+query:
+  max_samples: 50000000
+  timeout: 2m
+  max_concurrency: 20
+
+# Remote write configuration (optional)
+remote_write:
+  - url: "http://remote-storage:9201/write"
+    remote_timeout: 30s
+    queue_config:
+      capacity: 10000
+      max_shards: 200
+      max_samples_per_send: 500
+      batch_send_deadline: 5s
+      min_backoff: 30ms
+      max_backoff: 100ms
+
+# Remote read configuration (optional)
+remote_read:
+  - url: "http://remote-storage:9201/read"
+    read_recent: true
+    remote_timeout: 1m
