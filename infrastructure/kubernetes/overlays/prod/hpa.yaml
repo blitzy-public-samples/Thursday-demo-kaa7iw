@@ -1,0 +1,79 @@
+# Human Tasks:
+# 1. Verify that metrics-server is installed and running in the cluster
+# 2. Ensure the deployment has resource requests configured correctly
+# 3. Validate that the HPA permissions are configured in RBAC
+# 4. Monitor initial scaling behavior to fine-tune thresholds if needed
+
+# Kubernetes Horizontal Pod Autoscaler configuration for production environment
+# Addresses requirements:
+# - Production Auto-scaling (11.1 Deployment Environment/11.1.2 Environment Specifications)
+# - Resource-based Scaling (11.4 Orchestration/11.4.2 Kubernetes Resources)
+
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: code-generation-app-hpa
+  namespace: code-generation-app
+  labels:
+    app: code-generation-app
+    environment: production
+    managed-by: kustomize
+  annotations:
+    app.kubernetes.io/name: code-generation-app
+    app.kubernetes.io/part-of: code-generation-app
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/environment: production
+    
+    # Scaling behavior annotations
+    autoscaling.alpha.kubernetes.io/behavior: |
+      {
+        "scaleUp": {
+          "stabilizationWindowSeconds": 300,
+          "policies": [
+            {
+              "type": "Pods",
+              "value": 2,
+              "periodSeconds": 60
+            }
+          ]
+        },
+        "scaleDown": {
+          "stabilizationWindowSeconds": 600,
+          "policies": [
+            {
+              "type": "Pods",
+              "value": 1,
+              "periodSeconds": 120
+            }
+          ]
+        }
+      }
+
+spec:
+  # Target the production deployment
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: code-generation-app
+
+  # Scaling limits as per requirements
+  minReplicas: 3
+  maxReplicas: 10
+
+  # Scaling metrics
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
