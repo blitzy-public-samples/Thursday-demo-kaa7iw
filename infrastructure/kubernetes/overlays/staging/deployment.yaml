@@ -1,0 +1,168 @@
+# Human Tasks:
+# 1. Ensure the container image is built and pushed to the container registry
+# 2. Verify that the resource limits match the GKE node pool configuration
+# 3. Confirm that the health check endpoints are implemented in the application
+# 4. Validate that the configmap and secrets are properly created
+# 5. Check that the namespace exists before deploying
+
+# Kubernetes v1.24+ Deployment configuration for staging environment
+# Addresses requirements:
+# - Staging Environment Deployment (11.1 Deployment Environment/11.1.2 Environment Specifications)
+# - Container Configuration (11.3 Containerization/11.3.1 Docker Configuration)
+# - Resource Management (11.4 Orchestration/11.4.2 Kubernetes Resources)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: code-generation-app
+  namespace: code-generation-app
+  labels:
+    app: code-generation-app
+    environment: staging
+    managed-by: kustomize
+    tier: application
+    version: v1
+  annotations:
+    app.kubernetes.io/name: code-generation-app
+    app.kubernetes.io/part-of: code-generation-app
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/environment: staging
+    kubernetes.io/change-cause: "Initial staging deployment"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
+
+spec:
+  # Fixed 2 instances for staging as per requirement 11.1.2
+  replicas: 2
+  
+  # Deployment strategy configuration
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  # Pod selector configuration
+  selector:
+    matchLabels:
+      app: code-generation-app
+      environment: staging
+  
+  template:
+    metadata:
+      labels:
+        app: code-generation-app
+        environment: staging
+        tier: application
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+        checksum/config: "${CONFIG_CHECKSUM}"
+        checksum/secrets: "${SECRETS_CHECKSUM}"
+    
+    spec:
+      # Security context for the pod
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      
+      # Service account configuration
+      serviceAccountName: code-generation-app
+      
+      # Container configuration
+      containers:
+      - name: code-generation-app
+        image: code-generation-app:staging
+        imagePullPolicy: Always
+        
+        # Security context for the container
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+        
+        # Container ports
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        
+        # Resource limits as per requirement 11.1.2
+        resources:
+          requests:
+            cpu: "2"
+            memory: "8Gi"
+          limits:
+            cpu: "2"
+            memory: "8Gi"
+        
+        # Environment variables from ConfigMap and Secrets
+        envFrom:
+        - configMapRef:
+            name: code-generation-app-config
+        - secretRef:
+            name: code-generation-app-secrets
+        
+        # Liveness probe configuration
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Readiness probe configuration
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        # Volume mounts for temporary data
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /var/cache
+      
+      # Volumes configuration
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      
+      # Pod scheduling configuration
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - code-generation-app
+              topologyKey: kubernetes.io/hostname
+      
+      # Node selection
+      nodeSelector:
+        environment: staging
+        
+      # Tolerations for node taints
+      tolerations:
+      - key: "environment"
+        operator: "Equal"
+        value: "staging"
+        effect: "NoSchedule"
