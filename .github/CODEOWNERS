@@ -1,0 +1,43 @@
+# Human Tasks:
+# 1. Ensure all listed teams exist in the GitHub organization
+# 2. Verify team members have appropriate access levels in GitHub
+# 3. Configure branch protection rules to enforce code owner reviews
+# 4. Enable "Require review from Code Owners" in repository settings
+# 5. Configure "Dismiss stale pull request approvals" in branch protection
+# 6. Set up automated reviewer assignment in repository settings
+
+# Default ownership - Requirement: Security Compliance - Default access control
+*                                   @project-leads
+
+# Authentication service - Requirement: Data Security - High sensitivity data handling
+src/backend/app/services/auth_service.py    @security-team @auth-team
+
+# Data models - Requirement: Data Security - Data classification controls
+src/backend/app/models/*             @data-team @backend-team
+
+# Database layer - Requirement: Access Control - Database security patterns
+src/backend/app/database/*           @data-team @dba-team
+
+# API endpoints - Requirement: Security Compliance - API access control
+src/backend/app/api/v1/*             @api-team @backend-team
+
+# Security middleware - Requirement: Security Compliance - Security controls
+src/backend/app/middleware/*         @security-team @backend-team
+
+# Infrastructure as Code - Requirement: Security Compliance - Infrastructure security
+infrastructure/terraform/*           @devops-team @security-team
+
+# Kubernetes configurations - Requirement: Security Compliance - Container security
+infrastructure/kubernetes/*          @devops-team @platform-team
+
+# CI/CD workflows - Requirement: Security Compliance - Pipeline security
+.github/workflows/*                  @devops-team @ci-team
+
+# Monitoring configurations - Requirement: Security Compliance - Security monitoring
+src/backend/app/monitoring/*         @sre-team @platform-team
+
+# Logging configurations - Requirement: Data Security - Audit logging
+src/backend/app/logging/*            @sre-team @platform-team
+
+# Caching layer - Requirement: Data Security - Data access patterns
+src/backend/app/cache/*              @backend-team @performance-team
