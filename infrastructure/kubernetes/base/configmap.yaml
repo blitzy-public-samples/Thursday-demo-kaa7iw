@@ -1,0 +1,66 @@
+# Human Tasks:
+# 1. Ensure the NAMESPACE environment variable is set in your deployment pipeline
+# 2. Ensure the ENV environment variable is set in your deployment pipeline
+# 3. Verify that all data values comply with ConfigMap size limits (< 1MB)
+# 4. Confirm that all data keys follow DNS_SUBDOMAIN format
+
+# Kubernetes ConfigMap resource for code generation application
+# Addresses requirements:
+# - Environment Configuration (7. System Architecture/7.1 High-Level Architecture)
+# - Multi-Environment Support (11.1 Deployment Environment/11.1.1 Environment Architecture)
+# - Application Settings (7.5 Technology Stack)
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: code-generation-app-config
+  namespace: ${NAMESPACE}
+  labels:
+    app: code-generation-app
+    component: config
+    managed-by: kustomize
+    tier: application
+    version: v1
+  annotations:
+    app.kubernetes.io/part-of: code-generation-app
+    app.kubernetes.io/managed-by: kustomize
+    description: "Non-sensitive configuration for Code Generation Application"
+    last-updated: "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+data:
+  # Logging configuration
+  # Implements requirement: Environment Configuration
+  LOG_LEVEL: "INFO"
+
+  # Database connection pool settings
+  # Implements requirement: Application Settings
+  DATABASE_POOL_SIZE: "5"
+  DATABASE_MAX_OVERFLOW: "10"
+
+  # Redis connection settings
+  # Implements requirement: Application Settings
+  REDIS_MAX_CONNECTIONS: "10"
+
+  # API rate limiting configuration
+  # Implements requirement: Application Settings
+  RATE_LIMIT_DEFAULT: "100"
+
+  # JWT token configuration
+  # Implements requirement: Application Settings
+  JWT_ACCESS_TOKEN_EXPIRES: "3600"
+
+  # CORS configuration
+  # Implements requirement: Multi-Environment Support
+  CORS_ORIGINS: "https://${ENV}.code-generation-app.com"
+
+  # Additional application settings
+  # Implements requirement: Environment Configuration
+  APP_ENVIRONMENT: "${ENV}"
+  ENABLE_METRICS: "true"
+  METRICS_PATH: "/metrics"
+  HEALTH_CHECK_PATH: "/health"
+  API_VERSION: "v1"
+  MAX_REQUEST_SIZE: "10MB"
+  REQUEST_TIMEOUT: "30"
+  RETRY_ATTEMPTS: "3"
+  RETRY_DELAY: "5"
