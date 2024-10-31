@@ -35,7 +35,7 @@ jobs:
           fetch-depth: 0  # Required for SonarQube analysis
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v3
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       
@@ -118,7 +118,7 @@ jobs:
       - uses: actions/checkout@v3
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       
@@ -147,7 +147,7 @@ jobs:
       - uses: actions/checkout@v3
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       
