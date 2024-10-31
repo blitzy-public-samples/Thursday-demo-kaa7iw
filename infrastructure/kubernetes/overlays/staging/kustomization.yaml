@@ -1,0 +1,76 @@
+# Human Tasks:
+# 1. Create config.env file with staging environment configuration
+# 2. Create secrets.env file with staging environment secrets
+# 3. Ensure PROJECT_ID environment variable is set in the deployment pipeline
+# 4. Verify that deployment.yaml, service.yaml, and ingress.yaml exist in the same directory
+
+# Kustomize v4.5+ configuration for staging environment overlay
+# Addresses requirements from:
+# - 11.1 Deployment Environment/11.1.2 Environment Specifications
+# - 11.4 Orchestration/11.4.2 Kubernetes Resources
+# - 11.1 Deployment Environment/11.1.1 Environment Architecture
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Reference the base configuration
+# Implements requirement from 11.4 Orchestration/11.4.2 Kubernetes Resources
+bases:
+  - ../../base
+
+# Set the namespace for all resources
+# Implements requirement from 11.1 Deployment Environment/11.1.1 Environment Architecture
+namespace: code-generation-app
+
+# Add staging prefix to all resources
+# Implements requirement from 11.1 Deployment Environment/11.1.1 Environment Architecture
+namePrefix: staging-
+
+# Define staging-specific resources
+# Implements requirement from 11.4 Orchestration/11.4.2 Kubernetes Resources
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+
+# Apply staging-specific patches
+# Implements requirement from 11.1 Deployment Environment/11.1.2 Environment Specifications
+patchesStrategicMerge:
+  - deployment.yaml
+
+# Common labels for staging environment
+# Implements requirement from 11.1 Deployment Environment/11.1.1 Environment Architecture
+commonLabels:
+  environment: staging
+  app.kubernetes.io/environment: staging
+
+# Generate ConfigMap from environment file
+# Implements requirement from 11.4 Orchestration/11.4.2 Kubernetes Resources
+configMapGenerator:
+  - name: code-generation-app-config
+    behavior: merge
+    envs:
+      - config.env
+
+# Generate Secrets from environment file
+# Implements requirement from 11.4 Orchestration/11.4.2 Kubernetes Resources
+secretGenerator:
+  - name: code-generation-app-secrets
+    behavior: merge
+    envs:
+      - secrets.env
+
+# Configure container images
+# Implements requirement from 11.1 Deployment Environment/11.1.2 Environment Specifications
+images:
+  - name: code-generation-app
+    newName: gcr.io/${PROJECT_ID}/code-generation-app
+    newTag: staging
+
+# Validation rules enforced:
+# - Base path must be valid and exist
+# - Resource files must exist in the same directory
+# - Environment variables must be properly defined
+# - Image repository must be accessible
+# - Namespace must match environment configuration
+# - Labels must follow Kubernetes naming conventions
