@@ -1,0 +1,154 @@
+# Requirement: Containerization - Defines Docker Compose version
+version: '3.8'
+
+# Requirement: Containerization - Defines services configuration
+services:
+  # Requirement: Containerization - Flask backend service configuration
+  api:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    env_file: ../.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    networks:
+      - backend
+    # Requirement: Containerization - Resource limits configuration
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+    # Requirement: Containerization - Health check configuration
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Requirement: Database Configuration - PostgreSQL service configuration
+  db:
+    image: postgres:14-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-codegenapp}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      # Requirement: Database Configuration - Synchronous replication settings
+      - POSTGRES_MAX_CONNECTIONS=200
+      - POSTGRES_SHARED_BUFFERS=1GB
+      - POSTGRES_WAL_LEVEL=replica
+      - POSTGRES_SYNCHRONOUS_COMMIT=on
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - backend
+    # Requirement: Database Configuration - Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Requirement: Cache Configuration - Redis service configuration
+  redis:
+    image: redis:6-alpine
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+    # Requirement: Cache Configuration - Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Requirement: Monitoring Setup - Prometheus metrics collection
+  prometheus:
+    image: prom/prometheus:v2.30.0
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Requirement: Monitoring Setup - Grafana visualization
+  grafana:
+    image: grafana/grafana:8.0.0
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - backend
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# Requirement: Containerization - Persistent volume configuration
+volumes:
+  postgres_data:
+    name: postgres_data
+  redis_data:
+    name: redis_data
+  prometheus_data:
+    name: prometheus_data
+  grafana_data:
+    name: grafana_data
+
+# Requirement: Containerization - Network configuration
+networks:
+  backend:
+    name: backend
+    driver: bridge
