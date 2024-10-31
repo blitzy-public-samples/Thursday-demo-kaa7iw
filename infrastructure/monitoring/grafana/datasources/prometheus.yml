@@ -1,0 +1,54 @@
+# Human Tasks:
+# 1. Verify Prometheus service is accessible at http://prometheus:9090
+# 2. Ensure network policies allow Grafana to access Prometheus
+# 3. Verify Prometheus scrape interval matches timeInterval setting (15s)
+# 4. Configure appropriate resource limits for Grafana pods
+# 5. Review and adjust queryTimeout based on query complexity and load
+
+# Requirement: System Monitoring - Prometheus & Grafana integration
+# Version: Grafana v9.0+
+apiVersion: 1
+
+# Requirement: Infrastructure Monitoring - Health checks and performance monitoring
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+
+# Requirement: System Monitoring - Datasource configuration
+datasources:
+  - name: Prometheus
+    type: prometheus
+    # Requirement: Security Monitoring - Security metric collection
+    access: proxy  # Security consideration: Prevents direct client access to Prometheus
+    url: http://prometheus:9090  # Internal Kubernetes service name for network isolation
+    isDefault: true
+    version: 1
+    editable: false  # Security consideration: Prevents unauthorized modifications
+    jsonData:
+      timeInterval: "15s"  # Matches Prometheus scrape_interval
+      queryTimeout: "60s"  # Timeout for complex queries
+      httpMethod: "POST"
+      manageAlerts: true  # Enable alert management
+      prometheusType: "Prometheus"
+      prometheusVersion: "2.0.0"
+      cacheLevel: "Low"
+      disableMetricsLookup: false
+      exemplarTraceIdDestinations: []
+    secureJsonData: {}
+    uid: prometheus_main
+    # Requirement: Infrastructure Monitoring - Environment specifications
+    database: prometheus
+    user: ""  # No authentication required for internal cluster access
+    basicAuth: false
+    withCredentials: false
+    # Security consideration: TLS termination handled by Kubernetes ingress
+    tlsAuth: false
+    tlsAuthWithCACert: false
+    # Requirement: Security Monitoring - Implementation of security metrics
+    securitySettings:
+      tlsSkipVerify: false  # Enforce TLS verification
+      forwardOauth: false   # No OAuth forwarding needed
+    # Performance optimization settings
+    readOnly: true
+    maxConcurrentShardRequests: 10
+    timeSeriesPrecision: "1s"
